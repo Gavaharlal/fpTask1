@@ -1,15 +1,21 @@
 module Python.AST where
 
-import Control.Applicative
 import Control.Monad
 import Control.Monad.Free
 import Data.Functor.Classes
 
 type Name = String
 
+data Builtin = Print
+             | Input
+             deriving (Eq, Show)
+
 data Value = VInt Int
            | VBool Bool
            | VString String
+           | VDef [Name] Block
+           | VBuiltin Builtin
+           | VNone
            deriving (Eq, Show)
 
 data Binop = Add
@@ -33,15 +39,16 @@ data Unop = Not | Neg
 data Expression = Literal Value
           | Variable Name
           | Binop Binop Expression Expression
+          | Call Name [Expression]
           deriving (Eq, Show)
 
 data Statement = Expression Expression
-                | Assign Name Expression
-                | Return Expression
-                | If Expression Block
-                | While Expression Block
-                | Define Name [Name] Block
-                deriving (Eq, Show)
+          | Assign Name Expression
+          | Return Expression
+          | If Expression Block
+          | While Expression Block
+          | Define Name [Name] Block
+          deriving (Eq, Show)
 
 data Instruct next = Instruct Statement next
     deriving (Show, Show1, Functor)

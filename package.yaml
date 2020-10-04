@@ -28,6 +28,10 @@ library:
     - base >= 4.7 && < 5
     - mtl
     - free
+    - transformers
+    - containers
+    - joint
+    - lens
 
   default-extensions:
     - DeriveFoldable
@@ -36,6 +40,8 @@ library:
     - DeriveAnyClass
     - FlexibleInstances
     - LambdaCase
+    - TypeApplications
+    - TypeOperators
 
 executables:
   fpTask1-exe:
