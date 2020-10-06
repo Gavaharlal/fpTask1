@@ -24,6 +24,8 @@ type Interpreter = State [Scope] :> Either RuntimeError :> IO
 getValue :: Name -> Interpreter Value
 getValue "print" = return $ VBuiltin Print
 getValue "input" = return $ VBuiltin Input
+getValue "str" = return $ VBuiltin Str
+getValue "int" = return $ VBuiltin Int
 getValue _ = error "Not yet implemented" -- TODO var matching
 
 setValue :: Name -> Value -> Interpreter ()
@@ -68,7 +70,8 @@ stringify (VString x) = x
 
 builtin :: Builtin -> [Value] -> Interpreter Value
 builtin Print msg = do
-    lift $ lift $ print msg
+    let s = concat $ map stringify msg
+    lift $ lift $ putStr s
     return VNone
 builtin Input [] = do
     s <- lift $ lift getLine
