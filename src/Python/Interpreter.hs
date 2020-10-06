@@ -8,12 +8,15 @@ import Control.Lens (element, (%~))
 import Control.Monad.Except
 import Data.Functor
 import qualified Data.Map.Strict as M
+import Text.Read (readEither)
 
 type Scope = M.Map Name Value
 
 data RuntimeError = OutOfScope Name
                   | BinTypeMismatch Binop Value Value
                   | ArgumentMismatch Name Int
+                  | EarlyExit Value
+                  | ValueError String
                   deriving (Eq, Show)
 
 type Interpreter = State [Scope] :> Either RuntimeError :> IO
@@ -56,13 +59,32 @@ binop And (VBool l) (VBool r) = return $ VBool $ l && r
 binop Or (VBool l) (VBool r) = return $ VBool $ l || r
 binop op lhs rhs = failure $ BinTypeMismatch op lhs rhs
 
+
+stringify :: Value -> String
+stringify VNone = "None"
+stringify (VBool x) = show x
+stringify (VInt x) = show x
+stringify (VString x) = x
+
 builtin :: Builtin -> [Value] -> Interpreter Value
-builtin Print msg =
+builtin Print msg = do
+    lift $ lift $ print msg
     return VNone
 builtin Input [] = do
     s <- lift $ lift getLine
     return $ VString s
-builtin Input a = return VNone
+builtin Input args = failure $ ArgumentMismatch "input" (length args)
+builtin Str [v] = return . VString $ stringify v
+builtin Int [(VInt x)] = return $ VInt x
+builtin Int [(VBool False)] = return $ VInt 0
+builtin Int [(VBool True)] = return $ VInt 1
+builtin Int [(VString s)] = case readEither s of
+                              Left err -> failure $ ValueError err
+                              Right val -> return $ VInt val
+builtin Int [x] = failure . ValueError $ "Failed to parse int from " <> (stringify x)
+builtin fun args = failure $ ArgumentMismatch (show fun) (length args)
+
+
 
 eval :: Expression -> Interpreter Value
 eval (Literal x) = return x

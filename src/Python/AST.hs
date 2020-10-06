@@ -1,14 +1,14 @@
 module Python.AST where
 
+import Control.Applicative
 import Control.Monad
 import Control.Monad.Free
 import Data.Functor.Classes
 
 type Name = String
 
-data Builtin = Print
-             | Input
-             deriving (Eq, Show)
+data Builtin = Print | Input | Str | Int
+    deriving (Eq, Show)
 
 data Value = VInt Int
            | VBool Bool
@@ -39,16 +39,17 @@ data Unop = Not | Neg
 data Expression = Literal Value
           | Variable Name
           | Binop Binop Expression Expression
+          | Unop Unop Expression
           | Call Name [Expression]
           deriving (Eq, Show)
 
 data Statement = Expression Expression
-          | Assign Name Expression
-          | Return Expression
-          | If Expression Block
-          | While Expression Block
-          | Define Name [Name] Block
-          deriving (Eq, Show)
+               | Assign Name Expression
+               | Return Expression
+               | If Expression Block
+               | While Expression Block
+               | Define Name [Name] Block
+               deriving (Eq, Show)
 
 data Instruct next = Instruct Statement next
     deriving (Show, Show1, Functor)
@@ -56,31 +57,18 @@ data Instruct next = Instruct Statement next
 instance Eq1 Instruct where
     liftEq eq (Instruct stmt next) (Instruct stmt' next') = stmt == stmt' && eq next next'
 
-
-expr :: Expression -> Free Instruct ()
-expr = liftF . flip Instruct () . Expression
-
-assign :: Name -> Expression -> Free Instruct ()
-assign lhs rhs = liftF . flip Instruct () $ Assign lhs rhs
-
-ret :: Expression -> Free Instruct ()
-ret e = liftF . flip Instruct () $ Return e
-
-if' :: Expression -> Free Instruct () -> Free Instruct ()
-if' e true = liftF . flip Instruct () $ If e true
-
-while :: Expression -> Block -> Free Instruct ()
-while e block = liftF . flip Instruct () $ While e block
-
-def :: Name -> [Name] -> Block -> Free Instruct ()
-def name args block = liftF . flip Instruct () $ Define name args block
+command :: Statement -> Free Instruct ()
+command stmt = liftF $ Instruct stmt ()
 
 type Block = Free Instruct ()
 
-example :: Block
-example = do
-    assign "a" (Literal $ VInt 1)
-    assign "b" (Literal $ VInt 10)
-    while (Binop Lt (Variable "a") (Variable "b")) $ do
-        assign "a" (Binop Add (Variable "a") (Variable "a"))
+block :: [Statement] -> Block
+block stmts = sequence_ $ liftF . flip Instruct () <$> stmts
 
+--example :: Block
+--example = do
+--    assign "a" (Literal $ VInt 1)
+--    assign "b" (Literal $ VInt 10)
+--    while (Binop Lt (Variable "a") (Variable "b")) $ do
+--        assign "a" (Binop Add (Variable "a") (Variable "a"))
+--

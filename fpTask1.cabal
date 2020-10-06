@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 23e8dd972cf31114a66cf710636a7b2da80094bac31db0d6a77de2a01deddbe0
+-- hash: baa24aed298f76634af9ffed85d822d4acf8833f9a0924e240ada999f1fbd350
 
 name:           fpTask1
 version:        0.1.0.0
@@ -39,6 +39,7 @@ library
       base >=4.7 && <5
     , free
     , containers
+    , free
     , joint
     , lens
     , mtl
