@@ -43,6 +43,7 @@ library:
     - LambdaCase
     - TypeApplications
     - TypeOperators
+    - FlexibleContexts
 
 executables:
   fpTask1-exe:

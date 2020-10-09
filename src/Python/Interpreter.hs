@@ -5,7 +5,7 @@ import Control.Monad
 import Control.Monad.Free
 import Control.Joint
 import Control.Lens (element, (%~))
-import Control.Monad.Except
+import Data.Bool
 import Data.Functor
 import qualified Data.Map.Strict as M
 import Text.Read (readEither)
@@ -14,7 +14,8 @@ type Scope = M.Map Name Value
 
 data RuntimeError = OutOfScope Name
                   | BinTypeMismatch Binop Value Value
-                  | ArgumentMismatch Name Int
+                  | UnTypeMismatch Unop Value
+                  | ArgumentMismatch Name [Value]
                   | EarlyExit Value
                   | ValueError String
                   deriving (Eq, Show)
@@ -69,86 +70,68 @@ stringify (VInt x) = show x
 stringify (VString x) = x
 
 builtin :: Builtin -> [Value] -> Interpreter Value
-builtin Print msg = do
-    let s = concat $ map stringify msg
-    lift $ lift $ putStr s
-    return VNone
-builtin Input [] = do
-    s <- lift $ lift getLine
-    return $ VString s
-builtin Input args = failure $ ArgumentMismatch "input" (length args)
-builtin Str [v] = return . VString $ stringify v
-builtin Int [(VInt x)] = return $ VInt x
-builtin Int [(VBool False)] = return $ VInt 0
-builtin Int [(VBool True)] = return $ VInt 1
-builtin Int [(VString s)] = case readEither s of
-                              Left err -> failure $ ValueError err
-                              Right val -> return $ VInt val
-builtin Int [x] = failure . ValueError $ "Failed to parse int from " <> (stringify x)
-builtin fun args = failure $ ArgumentMismatch (show fun) (length args)
-
+builtin Print msg = VNone <$ (adapt . putStrLn . concat $ stringify <$> msg)
+builtin Input [] = adapt $ VString <$> getLine
+builtin Str [v] = pure . VString $ stringify v
+builtin Int [(VInt x)] = pure $ VInt x
+builtin Int [(VBool False)] = pure $ VInt 0
+builtin Int [(VBool True)] = pure $ VInt 1
+builtin Int [(VString s)] = either (failure @RuntimeError . ValueError) (pure . VInt) $ readEither s
+builtin Int [x] = failure . ValueError $ "Failed to parse int from " <> stringify x
+builtin fun args = failure $ ArgumentMismatch (show fun) args
 
 
 eval :: Expression -> Interpreter Value
 eval (Literal x) = return x
 eval (Variable ident) = getValue ident
-eval (Binop op lhs rhs) = do
-    l <- eval lhs
-    r <- eval rhs
-    binop op l r
-eval (Call fun args) = do
-    f <- getValue fun
-    vals <- mapM eval args
-    case f of
-      VDef params block -> do
-          when (length vals /= length params) $
-              failure $ ArgumentMismatch fun (length vals)
-          modify (M.fromList (zip params vals):)
-          retval <- interpret block $> VNone --dummy for now TODO early return
-          modify @[Scope] tail -- pop frame
-          return retval
-      VBuiltin fun -> builtin fun vals
-      _ -> failure $ OutOfScope fun
+eval (Binop op lhs rhs) = join $ binop op <$> eval lhs <*> eval rhs
+eval (Call fun args) = getValue fun >>= \case
+    VDef params block -> executeFunctionBlock fun args params block
+    VBuiltin fun -> traverse eval args >>= builtin fun
+    _ -> failure $ OutOfScope fun
 
-evalBool :: Expression -> Interpreter Bool
-evalBool e = do
-    val <- eval e
-    return $ case val of
-      VInt 0 -> False
-      VString "" -> False
-      VBool False -> False
-      VNone -> False
-      _ -> True
+early :: Interpreter Value -> Interpreter Value
+early x = current @[Scope] >>= adapt . run . (snd <$>) . run x >>= \case
+    Left (EarlyExit v) -> pure v
+    Left err -> failure err
+    Right v -> pure v
+
+executeFunctionBlock :: Name -> [Expression] -> [Name] -> Block -> Interpreter Value
+executeFunctionBlock fun args params block = do
+    vals <- traverse eval args
+    checkArity fun vals params
+    modify @[Scope] (M.fromList (zip params vals):)
+    retval <- early $ interpret block $> VNone
+    modify @[Scope] tail
+    pure retval
+
+checkArity :: Name -> [Value] -> [Name] -> Interpreter ()
+checkArity fun vals params = when (length vals /= length params)
+    . failure $ ArgumentMismatch fun vals
+
+dummy :: Value -> Bool
+dummy (VInt 0) = False
+dummy (VString "") = False
+dummy (VBool False) = False
+dummy VNone = False
+dummy _ = True
 
 interpret :: Block -> Interpreter ()
-interpret (Pure ()) = return ()
-interpret this@(Free (Instruct stmt next)) = do
-    case stmt of
-      Expression e -> do
-          eval e
-          interpret next
-      Assign lhs rhs -> do
-          v <- eval rhs
-          setValue lhs v
-          interpret next
-      Return e -> do
-          eval e
-          return ()
-      If e true -> do
-          val <- evalBool e
-          when val $ interpret true >> return ()
-          interpret next
-      While e block -> do
-          val <- evalBool e
-          if val then interpret block >> interpret this
-                 else interpret next
-      Define fun params block -> do
-          setValue fun $ VDef params block
-          interpret next
+interpret (Pure ()) = pure ()
+interpret this@(Free (Instruct stmt next)) = case stmt of
+    Expression e -> eval e *> interpret next
+    Define fun params block -> setValue fun (VDef params block) *> interpret next
+    Assign lhs rhs -> (eval rhs >>= setValue lhs) *> interpret next
+    If e true -> (dummy <$> eval e >>= bool (pure ()) (interpret true)) *> interpret next
+    While e block -> dummy <$> eval e >>= bool (interpret next) (interpret block *> interpret this)
+    Return e -> eval e >>= failure @RuntimeError . EarlyExit
 
 execute :: Interpreter () -> IO ()
 execute i = run (snd <$> run i [mempty]) >>= \case
     Left (OutOfScope i) -> putStrLn $ "Identifier not found: " <> show i
     Left (BinTypeMismatch op lhs rhs) -> putStrLn $ "Attempt to perform " <> show op <> " on " <> show lhs <> " and " <> show rhs
-    Left (ArgumentMismatch fun n) -> putStrLn $ "Attempt to call " <> fun <> " with " <> show n <> " arguments"
+    Left (UnTypeMismatch op expr) -> putStrLn $ "Attempt to perform " <> show op <> " on " <> show expr
+    Left (ArgumentMismatch fun args) -> putStrLn $ "Attempt to call " <> fun <> " with " <> show (length args) <> " arguments"
+    Left (EarlyExit _) -> putStrLn "Return from top level"
+    Left (ValueError msg) -> putStrLn $ "ValueError: " <> msg
     Right () -> pure ()
