@@ -22,17 +22,18 @@ data RuntimeError = OutOfScope Name
 
 type Interpreter = State [Scope] :> Either RuntimeError :> IO
 
-getValue :: Name -> Interpreter Value
+getValue :: (Monad m, Stateful [Scope] m, Failable RuntimeError m) => Name -> m Value
 getValue "print" = return $ VBuiltin Print
 getValue "input" = return $ VBuiltin Input
 getValue "str" = return $ VBuiltin Str
 getValue "int" = return $ VBuiltin Int
-getValue _ = error "Not yet implemented" -- TODO var matching
+getValue ident = M.lookup ident <$$> current @[Scope]
+    >>= maybe (failure @RuntimeError $ OutOfScope ident) pure . msum
 
 setValue :: Name -> Value -> Interpreter ()
 setValue ident value = modify @[Scope] $ element 0 %~ M.insert ident value
 
-binop :: Binop -> Value -> Value -> Interpreter Value
+binop :: (Monad m, Failable RuntimeError m) => Binop -> Value -> Value -> m Value
 binop Add (VInt l) (VInt r) = return $ VInt $ l + r
 binop Add (VString l) (VString r) = return $ VString $ l <> r
 binop Sub (VInt l) (VInt r) = return $ VInt $ l - r
@@ -62,6 +63,11 @@ binop And (VBool l) (VBool r) = return $ VBool $ l && r
 binop Or (VBool l) (VBool r) = return $ VBool $ l || r
 binop op lhs rhs = failure $ BinTypeMismatch op lhs rhs
 
+unop :: (Applicative m, Failable RuntimeError m) => Unop -> Value -> m Value
+unop Not val = pure . VBool . not $ dummy val
+unop Neg (VInt x) = pure . VInt $ negate x
+unop op expr = failure $ UnTypeMismatch op expr
+
 
 stringify :: Value -> String
 stringify VNone = "None"
@@ -69,7 +75,7 @@ stringify (VBool x) = show x
 stringify (VInt x) = show x
 stringify (VString x) = x
 
-builtin :: Builtin -> [Value] -> Interpreter Value
+builtin :: (Applicative t, Adaptable IO t, Failable RuntimeError t) => Builtin -> [Value] -> t Value
 builtin Print msg = VNone <$ (adapt . putStrLn . concat $ stringify <$> msg)
 builtin Input [] = adapt $ VString <$> getLine
 builtin Str [v] = pure . VString $ stringify v
