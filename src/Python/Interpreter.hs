@@ -92,6 +92,7 @@ eval :: Expression -> Interpreter Value
 eval (Literal x) = return x
 eval (Variable ident) = getValue ident
 eval (Binop op lhs rhs) = join $ binop op <$> eval lhs <*> eval rhs
+eval (Unop op expr) = eval expr >>= unop op
 eval (Call fun args) = getValue fun >>= \case
     VDef params block -> executeFunctionBlock fun args params block
     VBuiltin fun -> traverse eval args >>= builtin fun

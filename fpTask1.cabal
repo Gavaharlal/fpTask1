@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 105d49676307be9425cd5bd5767de48d2955ca2022a407aa861593e1c3a750d4
+-- hash: e5b3015bad184433231e42a033f4ba674c1983e0202cc20ee91f4373bc076134
 
 name:           fpTask1
 version:        0.1.0.0
@@ -37,7 +37,6 @@ library
   default-extensions: DeriveFoldable DeriveFunctor DeriveFunctor DeriveAnyClass FlexibleInstances LambdaCase TypeApplications TypeOperators FlexibleContexts
   build-depends:
       base >=4.7 && <5
-    , free
     , containers
     , free
     , joint
