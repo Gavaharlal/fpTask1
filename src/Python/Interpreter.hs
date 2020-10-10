@@ -1,37 +1,39 @@
 module Python.Interpreter where
 
 import Python.AST
+import Prelude hiding (lookup)
 import Control.Monad
 import Control.Monad.Free
 import Control.Joint
 import Control.Lens (element, (%~))
 import Data.Bool
 import Data.Functor
-import qualified Data.Map.Strict as M
+import Data.Map.Strict (Map, fromList, insert, lookup)
 import Text.Read (readEither)
 
-type Scope = M.Map Name Value
+type Scope = Map Name Value
+type Callstack = [Scope]
 
-data RuntimeError = OutOfScope Name
+data RuntimeError =  ValueError String
+                  | OutOfScope Name
+                  | ArgumentMismatch Name [Value]
                   | BinTypeMismatch Binop Value Value
                   | UnTypeMismatch Unop Value
-                  | ArgumentMismatch Name [Value]
                   | EarlyExit Value
-                  | ValueError String
-                  deriving (Eq, Show)
+                  deriving (Show)
 
-type Interpreter = State [Scope] :> Either RuntimeError :> IO
+type Interpreter = State Callstack :> Either RuntimeError :> IO
 
-getValue :: (Monad m, Stateful [Scope] m, Failable RuntimeError m) => Name -> m Value
+getValue :: (Monad m, Stateful Callstack m, Failable RuntimeError m) => Name -> m Value
 getValue "print" = return $ VBuiltin Print
 getValue "input" = return $ VBuiltin Input
 getValue "str" = return $ VBuiltin Str
 getValue "int" = return $ VBuiltin Int
-getValue ident = M.lookup ident <$$> current @[Scope]
+getValue ident = lookup ident <$$> current @Callstack
     >>= maybe (failure @RuntimeError $ OutOfScope ident) pure . msum
 
-setValue :: Name -> Value -> Interpreter ()
-setValue ident value = modify @[Scope] $ element 0 %~ M.insert ident value
+setValue :: (Stateful Callstack m) => Name -> Value -> m ()
+setValue ident value = modify @Callstack $ element 0 %~ insert ident value
 
 binop :: (Monad m, Failable RuntimeError m) => Binop -> Value -> Value -> m Value
 binop Add (VInt l) (VInt r) = return $ VInt $ l + r
@@ -45,8 +47,7 @@ binop Eq (VBool l) (VBool r) = return $ VBool $ l == r
 binop Eq (VString l) (VString r) = return $ VBool $ l == r
 binop Eq VNone VNone = return $ VBool True
 binop Eq _ _ = return $ VBool False
-binop Ne l r = binop Eq l r >>= \case
-    VBool beq -> pure . VBool $ not beq
+binop Ne l r = binop Eq l r >>= \(VBool beq) -> pure . VBool $ not beq
 binop Gt (VInt l) (VInt r) = return $ VBool $ l > r
 binop Gt (VBool l) (VBool r) = return $ VBool $ l > r
 binop Gt (VString l) (VString r) = return $ VBool $ l > r
@@ -97,21 +98,24 @@ eval (Call fun args) = getValue fun >>= \case
     _ -> failure $ OutOfScope fun
 
 early :: Interpreter Value -> Interpreter Value
-early x = current @[Scope] >>= adapt . run . (snd <$>) . run x >>= \case
+early i = current @Callstack >>= adapt . result i >>= \case
     Left (EarlyExit v) -> pure v
     Left err -> failure err
     Right v -> pure v
+
+result :: Interpreter a -> Callstack -> IO (Either RuntimeError a)
+result i callstack = run $ snd <$> run i callstack
 
 executeFunctionBlock :: Name -> [Expression] -> [Name] -> Block -> Interpreter Value
 executeFunctionBlock fun args params block = do
     vals <- traverse eval args
     checkArity fun vals params
-    modify @[Scope] (M.fromList (zip params vals):)
+    modify (fromList (zip params vals) :) -- :)
     retval <- early $ interpret block $> VNone
-    modify @[Scope] tail
+    modify @Callstack tail
     pure retval
 
-checkArity :: Name -> [Value] -> [Name] -> Interpreter ()
+checkArity :: (Applicative m, Failable RuntimeError m) => Name -> [Value] -> [Name] -> m ()
 checkArity fun vals params = when (length vals /= length params)
     . failure $ ArgumentMismatch fun vals
 
@@ -124,17 +128,17 @@ dummy _ = True
 
 interpret :: Block -> Interpreter ()
 interpret (Pure ()) = pure ()
-interpret this@(Free (Instruct stmt next)) = case stmt of
-    Expression e -> eval e *> interpret next
-    Define fun params block -> setValue fun (VDef params block) *> interpret next
-    Assign lhs rhs -> (eval rhs >>= setValue lhs) *> interpret next
-    If e true -> (dummy <$> eval e >>= bool (pure ()) (interpret true)) *> interpret next
-    While e block -> dummy <$> eval e >>= bool (interpret next) (interpret block *> interpret this)
-    Return e -> eval e >>= failure @RuntimeError . EarlyExit
+interpret (Free (Instruct (Expression e) next)) = eval e *> interpret next
+interpret (Free (Instruct (Define fun params block) next)) = setValue fun (VDef params block) *> interpret next
+interpret (Free (Instruct (Assign lhs rhs) next)) = (eval rhs >>= setValue lhs) *> interpret next
+interpret (Free (Instruct (If e true) next)) = (dummy <$> eval e >>= bool (pure ()) (interpret true)) *> interpret next
+interpret this@(Free (Instruct (While e block) next)) = dummy <$> eval e >>= bool (interpret next) (interpret block *> interpret this)
+interpret (Free (Instruct (Return e) next)) = eval e >>= failure @RuntimeError . EarlyExit
+
 
 execute :: Interpreter () -> IO ()
-execute i = run (snd <$> run i [mempty]) >>= \case
-    Left (OutOfScope i) -> putStrLn $ "Identifier not found: " <> show i
+execute i = result i [mempty] >>= \case
+    Left (OutOfScope i) -> putStrLn $ "Name not found: " <> show i
     Left (BinTypeMismatch op lhs rhs) -> putStrLn $ "Attempt to perform " <> show op <> " on " <> show lhs <> " and " <> show rhs
     Left (UnTypeMismatch op expr) -> putStrLn $ "Attempt to perform " <> show op <> " on " <> show expr
     Left (ArgumentMismatch fun args) -> putStrLn $ "Attempt to call " <> fun <> " with " <> show (length args) <> " arguments"
