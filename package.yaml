@@ -34,6 +34,7 @@ library:
     - lens
     - free
     - megaparsec
+    - parser-combinators
 
   default-extensions:
     - DeriveFoldable

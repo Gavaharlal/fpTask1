@@ -6,10 +6,17 @@ import Control.Monad
 import Text.Megaparsec
 import Text.Megaparsec.Char (alphaNumChar, char, letterChar, space1, string, tab)
 import Text.Megaparsec.Char.Lexer
+import Control.Monad.Combinators.Expr
 
 import Python.AST
 
 type Parser = Parsec Void String
+
+python :: Parser Block
+python = parseTopLevelBlock <* eof where
+    parseTopLevelBlock :: Parser Block
+    parseTopLevelBlock = nonIndented scn
+        $ block <$> some parseStatement
 
 comment :: Parser ()
 comment = skipLineComment "#"
@@ -62,5 +69,54 @@ parseDef = indented $ reserved "def" *> (parseSubBlock <$> define) where
 parseSubBlock :: (Block -> Statement) -> IndentOpt Parser Statement Statement
 parseSubBlock f = IndentSome Nothing (pure . f . block) parseStatement
 
+parseTerm :: Parser Expression
+parseTerm = parens parseExpression
+    <|> try parseCall
+    <|> Variable <$> try parseName
+    <|> Literal . VInt <$> parseInt
+    <|> Literal . VString <$> parseStr
+    <|> Literal . VBool <$> parseBool
+    <|> reserved "None" $> Literal VNone
+
+parseCall :: Parser Expression
+parseCall = Call <$> parseName <*> parens (sepBy parseExpression $ symbol sc ",")
+
+
+parseExpression :: Parser Expression
+parseExpression = makeExprParser parseTerm $
+    [ [ Prefix (Unop Neg <$ symbol sc "-") ]
+    , [ Prefix (Unop Not <$ symbol sc "not") ]
+    , [ InfixL (Binop Mul <$ symbol sc "*")
+    , InfixL (Binop Div <$ symbol sc "/")
+    , InfixL (Binop Mod <$ symbol sc "%") ]
+    , [ InfixL (Binop Add <$ symbol sc "+")
+    , InfixL (Binop Sub <$ symbol sc "-") ]
+    , [ InfixL (Binop Eq <$ symbol sc "==")
+    , InfixL (Binop Ne <$ symbol sc "!=")
+    , InfixL (Binop Ge <$ symbol sc ">=")
+    , InfixL (Binop Le <$ symbol sc "<=")
+    , InfixL (Binop Gt <$ symbol sc ">")
+    , InfixL (Binop Lt <$ symbol sc "<") ]
+    , [ InfixL (Binop And <$ symbol sc "and") ]
+    , [ InfixL (Binop Or <$ symbol sc "or") ]
+    ]
+    
+parseExpressionStatement :: Parser Statement
+parseExpressionStatement = Expression <$> parseExpression <* scn
+
+parseAssign :: Parser Statement
+parseAssign = Assign <$> parseName <* symbol sc "=" <*> parseExpression <* scn
+
+parseReturn :: Parser Statement
+parseReturn = reserved "return" *> (Return <$> parseExpression) <* scn
+
+parseIf :: Parser Statement
+parseIf = indented $ parseSubBlock . If <$>
+    between (reserved "if") (symbol sc ":") parseExpression
+
+parseWhile :: Parser Statement
+parseWhile = indented $ parseSubBlock . While <$>
+    (reserved "while" *> parseExpression <* symbol sc ":")    
+
 parseStatement :: Parser Statement
-parseStatement = error "todo"
+parseStatement = choice $ try <$> [parseAssign, parseExpressionStatement, parseReturn, parseIf, parseWhile, parseDef]
