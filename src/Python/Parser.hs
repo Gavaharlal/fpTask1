@@ -100,7 +100,7 @@ parseExpression = makeExprParser parseTerm $
     , [ InfixL (Binop And <$ symbol sc "and") ]
     , [ InfixL (Binop Or <$ symbol sc "or") ]
     ]
-    
+
 parseExpressionStatement :: Parser Statement
 parseExpressionStatement = Expression <$> parseExpression <* scn
 
@@ -116,7 +116,7 @@ parseIf = indented $ parseSubBlock . If <$>
 
 parseWhile :: Parser Statement
 parseWhile = indented $ parseSubBlock . While <$>
-    (reserved "while" *> parseExpression <* symbol sc ":")    
+    (reserved "while" *> parseExpression <* symbol sc ":")
 
 parseStatement :: Parser Statement
 parseStatement = choice $ try <$> [parseAssign, parseExpressionStatement, parseReturn, parseIf, parseWhile, parseDef]

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b750d2d83627f0c7ff20a560e5933f9fa8884a27cec650666ecc1c7dd1c7dce5
+-- hash: 390a6c17c4a1916dadad138a6a4c400f65b4eba4c70989d6fd93df83f4cfce17
 
 name:           fpTask1
 version:        0.1.0.0
@@ -58,6 +58,7 @@ executable fpTask1-exe
   build-depends:
       base >=4.7 && <5
     , fpTask1
+    , megaparsec
   default-language: Haskell2010
 
 test-suite fpTask1-test

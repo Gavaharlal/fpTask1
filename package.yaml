@@ -57,6 +57,8 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - fpTask1
+    - megaparsec
+
 
 tests:
   fpTask1-test:
