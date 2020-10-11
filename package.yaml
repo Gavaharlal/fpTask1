@@ -70,3 +70,5 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - fpTask1
+    - hspec
+    - megaparsec
