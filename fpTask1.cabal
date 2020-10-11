@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e5b3015bad184433231e42a033f4ba674c1983e0202cc20ee91f4373bc076134
+-- hash: 7445494710e8f351e712824b403d8b6b9ac597eb9be5eb9e572d4a7bdda20a98
 
 name:           fpTask1
 version:        0.1.0.0
@@ -29,6 +29,7 @@ library
   exposed-modules:
       Python.AST
       Python.Interpreter
+      Python.Parser
       Python.Printer
   other-modules:
       Paths_fpTask1
@@ -41,6 +42,7 @@ library
     , free
     , joint
     , lens
+    , megaparsec
     , mtl
     , transformers
   default-language: Haskell2010

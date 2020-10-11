@@ -33,6 +33,7 @@ library:
     - joint
     - lens
     - free
+    - megaparsec
 
   default-extensions:
     - DeriveFoldable
