@@ -79,6 +79,11 @@ main = hspec $ do
                         read (head (env ^. output)) `shouldBe` myGCD a b
                         
     describe "Test interpreter exceptions" $ do
+        it "check ValueError" $ do
+            let excMessage = "Error converting string \"str\" to int"
+            let fileName = "testSources/incorrect/errValueError.py"
+            checkException excMessage fileName
+
         it "check OutOfScope" $ do
             let excMessage = "Name not found: \"a\""
             let fileName = "testSources/incorrect/errOutOfScope.py"
@@ -88,12 +93,21 @@ main = hspec $ do
             let excMessage = "Attempt to call funct with 3 arguments"
             let fileName = "testSources/incorrect/errArgumentMismatch.py"
             checkException excMessage fileName
-    
+            
+        it "check BinTypeMismatch" $ do
+            let excMessage = "Attempt to perform Div on VInt 100 and VString \"str\""
+            let fileName = "testSources/incorrect/errBinTypeMismatch.py"
+            checkException excMessage fileName
     
         it "check UnTypeMismatch" $ do
             let excMessage = "Attempt to perform Neg on VString \"str\""
             let fileName = "testSources/incorrect/errUnTypeMismatch.py"
-            checkException excMessage fileName                
+            checkException excMessage fileName     
+            
+        it "check EarlyExit" $ do
+            let excMessage = "Return from top level"
+            let fileName = "testSources/incorrect/errEarlyExit.py"
+            checkException excMessage fileName            
                         
                         
     describe "Test parser" $ do

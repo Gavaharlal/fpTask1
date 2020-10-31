@@ -10,7 +10,7 @@ import Control.Lens (makeLenses, element, (%~), (^.), (<>~), (.=))
 import Data.Bool
 import Data.Functor
 import Data.Map.Strict (Map, fromList, insert, lookup)
-import Text.Read (readEither)
+import Text.Read (readEither, readMaybe)
 
 type Scope = Map Name Value
 type Callstack = [Scope]
@@ -109,7 +109,7 @@ builtin Str [v] = pure . VString $ stringify v
 builtin Int [VInt x] = pure $ VInt x
 builtin Int [VBool False] = pure $ VInt 0
 builtin Int [VBool True] = pure $ VInt 1
-builtin Int [VString s] = either (throwError @RuntimeError . ValueError) (pure . VInt) $ readEither s
+builtin Int [VString s] = maybe (throwError $ ValueError s) (pure . VInt) $ readMaybe s
 builtin Int [x] = throwError . ValueError $ "Failed to parse int from " <> stringify x
 builtin fun args = throwError $ ArgumentMismatch (show fun) args
 
@@ -177,5 +177,5 @@ execute i = result i [mempty] >>= \case
     Left (UnTypeMismatch op expr) -> writeToEnv $ "Attempt to perform " <> show op <> " on " <> show expr
     Left (ArgumentMismatch fun args) -> writeToEnv $ "Attempt to call " <> fun <> " with " <> show (length args) <> " arguments"
     Left (EarlyExit _) -> writeToEnv "Return from top level"
-    Left (ValueError msg) -> writeToEnv $ "ValueError: " <> msg
+    Left (ValueError s) -> writeToEnv $ "Error converting string \"" <> s <> "\" to int"
     Right () -> pure ()
