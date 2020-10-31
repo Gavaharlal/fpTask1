@@ -10,7 +10,8 @@ import Control.Lens (makeLenses, element, (%~), (^.), (<>~), (.=))
 import Data.Bool
 import Data.Functor
 import Data.Map.Strict (Map, fromList, insert, lookup)
-import Text.Read (readEither, readMaybe)
+import Text.Read (readMaybe)
+import Data.List (intercalate)
 
 type Scope = Map Name Value
 type Callstack = [Scope]
@@ -101,6 +102,8 @@ stringify VNone = "None"
 stringify (VBool x) = show x
 stringify (VInt x) = show x
 stringify (VString x) = x
+stringify (VDef args _) = "f(" <> intercalate ", " args <> ")"
+stringify (VBuiltin x) = show x
 
 builtin :: (Interpretable m) => Builtin -> [Value] -> InterpreterT m Value
 builtin Print msg = VNone <$ lift (lift $ writeToEnv . concat $ stringify <$> msg)
@@ -109,7 +112,8 @@ builtin Str [v] = pure . VString $ stringify v
 builtin Int [VInt x] = pure $ VInt x
 builtin Int [VBool False] = pure $ VInt 0
 builtin Int [VBool True] = pure $ VInt 1
-builtin Int [VString s] = maybe (throwError $ ValueError s) (pure . VInt) $ readMaybe s
+builtin Int [VString s] = maybe (throwError $ ValueError errMsg) (pure . VInt) $ readMaybe s
+    where errMsg = "Error converting string \"" <> s <> "\" to int"
 builtin Int [x] = throwError . ValueError $ "Failed to parse int from " <> stringify x
 builtin fun args = throwError $ ArgumentMismatch (show fun) args
 
@@ -177,5 +181,5 @@ execute i = result i [mempty] >>= \case
     Left (UnTypeMismatch op expr) -> writeToEnv $ "Attempt to perform " <> show op <> " on " <> show expr
     Left (ArgumentMismatch fun args) -> writeToEnv $ "Attempt to call " <> fun <> " with " <> show (length args) <> " arguments"
     Left (EarlyExit _) -> writeToEnv "Return from top level"
-    Left (ValueError s) -> writeToEnv $ "Error converting string \"" <> s <> "\" to int"
+    Left (ValueError s) -> writeToEnv $ s
     Right () -> pure ()

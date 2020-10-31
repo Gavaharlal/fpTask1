@@ -79,9 +79,14 @@ main = hspec $ do
                         read (head (env ^. output)) `shouldBe` myGCD a b
                         
     describe "Test interpreter exceptions" $ do
-        it "check ValueError" $ do
+        it "check ValueError (parse string)" $ do
             let excMessage = "Error converting string \"str\" to int"
-            let fileName = "testSources/incorrect/errValueError.py"
+            let fileName = "testSources/incorrect/errValueError1.py"
+            checkException excMessage fileName
+
+        it "check ValueError (parse definition)" $ do
+            let excMessage = "Failed to parse int from f(a, b, c)"
+            let fileName = "testSources/incorrect/errValueError2.py"
             checkException excMessage fileName
 
         it "check OutOfScope" $ do
