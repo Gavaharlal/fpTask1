@@ -30,7 +30,7 @@ library:
     - free
     - transformers
     - containers
-    - joint
+    - mtl
     - lens
     - free
     - megaparsec
@@ -46,6 +46,7 @@ library:
     - TypeApplications
     - TypeOperators
     - FlexibleContexts
+    - TemplateHaskell
 
 executables:
   fpTask1-exe:
@@ -72,3 +73,7 @@ tests:
     - fpTask1
     - hspec
     - megaparsec
+    - mtl
+    - containers
+    - lens
+

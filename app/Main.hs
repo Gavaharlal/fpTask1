@@ -1,16 +1,10 @@
 module Main where
 
-import Python.AST (Block)
 import Python.Interpreter (execute, interpret)
-import Python.Parser (python)
 import Python.Printer (prettyprintEDSL, prettyprintSource)
 import System.Environment (getArgs, getProgName)
-import Text.Megaparsec (errorBundlePretty, parse)
+import Utils (parsing)
 
-parsing :: FilePath -> IO Block
-parsing f =
-  readFile f
-    >>= either (error . errorBundlePretty) pure . parse python f
 
 proceed :: [String] -> IO ()
 proceed ["prettify", f] = putStr . prettyprintSource =<< parsing f

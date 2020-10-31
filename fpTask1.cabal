@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9a32b60940a3644c283cca0466e8794bdfb2f20833a656c4bf738c257ed86ea4
+-- hash: 8c01da176987ac6e3c99d0c0a6e1da9a0bafc4d01d9472f19e4902f8184cc622
 
 name:           fpTask1
 version:        0.1.0.0
@@ -31,16 +31,16 @@ library
       Python.Interpreter
       Python.Parser
       Python.Printer
+      Utils
   other-modules:
       Paths_fpTask1
   hs-source-dirs:
       src
-  default-extensions: DeriveFoldable DeriveFunctor DeriveFunctor DeriveAnyClass FlexibleInstances LambdaCase TypeApplications TypeOperators FlexibleContexts
+  default-extensions: DeriveFoldable DeriveFunctor DeriveFunctor DeriveAnyClass FlexibleInstances LambdaCase TypeApplications TypeOperators FlexibleContexts TemplateHaskell
   build-depends:
       base >=4.7 && <5
     , containers
     , free
-    , joint
     , lens
     , megaparsec
     , mtl
@@ -71,7 +71,10 @@ test-suite fpTask1-test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , containers
     , fpTask1
     , hspec
+    , lens
     , megaparsec
+    , mtl
   default-language: Haskell2010

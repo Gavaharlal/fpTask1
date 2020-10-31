@@ -34,9 +34,6 @@ packages:
 # These entries can reference officially published versions as well as
 # forks / in-progress versions pinned to a git hash. For example:
 #
-extra-deps:
-  - github: iokasimov/joint
-    commit: 89ebeef5c6ec684b6ade379ce3a9a93e1184a798
 #
 # extra-deps: []
 
