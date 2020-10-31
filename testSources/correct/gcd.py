@@ -8,13 +8,6 @@ def gcd(a, b):
         b = t % b
     return a
 
-print("Input a: ")
 a = int(input())
-
-
-
-print("Input b: ")
 b = int(input())
-print()
-print("GCD of a and b:")
 print(gcd(a, b))

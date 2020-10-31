@@ -1,6 +1,6 @@
 x = 5
 y = 6
-temp = x
+temp = x + x - y * 5
 x = y
 y = temp
 xy = x - y
